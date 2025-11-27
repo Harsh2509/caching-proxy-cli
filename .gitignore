@@ -1,1 +1,6 @@
 *.o
+# gitignore uses glob syntax, not regex. To ignore names that contain an underscore but
+# do not contain a dot, ignore underscore-containing names and then re-include any path
+# that contains a dot (the later negation overrides the previous ignore).
+*_*
+!*.*
