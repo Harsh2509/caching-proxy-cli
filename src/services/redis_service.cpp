@@ -16,9 +16,9 @@ redisContext *create_redis_connection(){
                 std::cerr << "Can't allocate Redis context" << std::endl;
             return nullptr;
         }
-        else
-            std::cout << "Connected to Redis" << std::endl;
-    
+        else{
+            // std::cout << "Connected to Redis" << std::endl;
+        }
         return c;
     }
     catch(const std::exception &e){
@@ -36,7 +36,7 @@ redisContext *get_redis_connection(){
     }
 }
 
-void redis_service::set_value(const std::string &key, const std::string &value){
+void redis_service::set_value(const std::string &key, const std::string &value, const int &expire_seconds){
     redisContext *conn = get_redis_connection();
     if (!conn) {
         std::cerr << "No Redis connection available in set_value" << std::endl;
@@ -47,6 +47,13 @@ void redis_service::set_value(const std::string &key, const std::string &value){
         freeReplyObject(reply);
     } else {
         std::cerr << "Redis SET command failed" << std::endl;
+    }
+
+    reply = static_cast<redisReply*> (redisCommand(conn, "EXPIRE %s %d", key.c_str(), expire_seconds));
+    if (reply){
+        freeReplyObject(reply);
+    }else{
+        std::cerr << "REDIS EXPIRE command failed" << std::endl;
     }
 }
 

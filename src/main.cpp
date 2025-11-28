@@ -5,12 +5,9 @@
 #include "utils/cli_out.h"
 #include "utils/utils.h"
 #include "utils/validation.h"
+#include "services/redis_service.h"
+#include "utils/api_factory.h"
 
-long long factorial(int n) {
-    long long result = 1;
-    for (int i = 2; i <= n; ++i) result *= i;
-    return result;
-}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -28,30 +25,47 @@ int main(int argc, char* argv[]) {
     } else if (command == "--version") {
         print_version();
     } else {
-        // Check whether both flags are present anywhere in the arguments
-        bool has_port = false;
+        // Check if --origin flag is present (required)
         bool has_origin = false;
         for (const auto &a : command_args) {
-            if (a == "--port") has_port = true;
             if (a == "--origin") has_origin = true;
         }
 
-        if (has_port && has_origin) {
-        // If command has --port and --origin flag
-        // Valid command: caching-proxy --port <number> --origin <url> OR --origin <url> --port <number>
-            if (is_command_valid(command_args)){
-                // TODO: start the proxy (not implemented yet)
-            } else {
-                std::cerr << "Invalid command\n";
-                print_help();
-                return 1;
-            }
-        } else {
-            std::cerr << "Unknown command: " << command << "\n";
+        if (!has_origin) {
+            std::cerr << "Error: --origin flag is required\n";
             print_help();
             return 1;
         }
+
+        // Validate command and extract configuration
+        if (!is_command_valid(command_args)) {
+            std::cerr << "Invalid command\n";
+            print_help();
+            return 1;
+        }
+
+        auto config = extract_config(command_args);
+        if (!config.has_value()) {
+            return 1;
+        }
+    
+        // Getting the url ready
+        std::string url = config->origin_url;
+        if (config->port != -1){
+            url += ":" + std::to_string(config->port);
+        }
         
+        std::string response = redis_service::get_value(url);
+        if (response.length()){
+            std::cout << "Cache hit" << std::endl;
+            std::cout << response << std::endl;
+        }
+        else{
+            std::cout << "Cache miss" << std::endl;
+            HttpResponse res = send_get_request(url);
+            redis_service::set_value(url, res.body, 120);
+            std::cout << res.body << std::endl;
+        }
     }
     return 0;
 }

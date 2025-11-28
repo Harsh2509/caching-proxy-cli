@@ -1,9 +1,11 @@
 #include "api_factory.h"
+#include "../services/redis_service.h"
 #include <curl/curl.h>
 #include <string>
 #include <vector>
 #include <memory>
 #include <stdexcept>
+#include <iostream>
 
 namespace {
     /**
@@ -115,14 +117,18 @@ HttpResponse send_get_request(const std::string& url) {
     try {
         // Create CURL handle with RAII
         CurlHandle curl_handle;
-        std::string response_body;
+        std::string response_body_string;
+        std::string header_string;
         
         // Configure CURL options
         curl_easy_setopt(curl_handle.get(), CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEDATA, &response_body);
         curl_easy_setopt(curl_handle.get(), CURLOPT_FOLLOWLOCATION, 1L);
-        
+        curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEFUNCTION,  write_callback);
+        curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEDATA, &response_body_string);
+
+        curl_easy_setopt(curl_handle.get(), CURLOPT_HEADERFUNCTION, write_callback);
+        curl_easy_setopt(curl_handle.get(), CURLOPT_HEADERDATA, &header_string);
+
         // Set reasonable timeouts
         curl_easy_setopt(curl_handle.get(), CURLOPT_TIMEOUT, 30L);
         curl_easy_setopt(curl_handle.get(), CURLOPT_CONNECTTIMEOUT, 10L);
@@ -132,7 +138,8 @@ HttpResponse send_get_request(const std::string& url) {
         
         if (res == CURLE_OK) {
             response.success = true;
-            response.body = std::move(response_body);
+            response.body = std::move(response_body_string);
+
         } else {
             response.success = false;
             response.error_message = curl_easy_strerror(res);
